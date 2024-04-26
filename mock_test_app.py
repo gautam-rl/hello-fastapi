@@ -1,14 +1,16 @@
 from unittest.mock import MagicMock
+import pytest
 from app import home
 from sqlalchemy.orm import Session
 
-# Create a mock database session
-mock_db = MagicMock(spec=Session)
+@pytest.fixture
+def mock_db():
+    db = MagicMock(spec=Session)
+    db.query.return_value.all.return_value = []
+    return db
 
-# Mock the `query` method to prevent actual database operations
-mock_db.query.return_value.all.return_value = []
+def test_home(mock_db):
+    result = home(req=MagicMock(), db=mock_db)
+    assert result is not None  # Replace with an appropriate assertion
 
-# Call the `home` function with the mock request and database session
-result = home(req=MagicMock(), db=mock_db)
 
-print("Mock test completed successfully, no errors.")
