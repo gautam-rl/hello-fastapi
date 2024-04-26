@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 import pytest
-from app import home
+from app import app.home
 from sqlalchemy.orm import Session
 
 @pytest.fixture
