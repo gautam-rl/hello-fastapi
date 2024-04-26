@@ -1,2 +1,2 @@
-I want you to run pytest to determine code coverage in the repo, and then add
-any missing test cases.
+I want you to use the folowing coverage report to identify missing test coverage
+and write tests to improve coverage.
