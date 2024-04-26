@@ -11,3 +11,4 @@ langchain
 langchain-community
 langchain-openai
 tavily-python
+python-dotenv
