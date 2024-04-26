@@ -17,7 +17,7 @@ app = FastAPI()
 def get_db():
     db = SessionLocal()
     try: 
-        yield db
+        yield None
     finally:
         db.close()
 
