@@ -7,3 +7,7 @@ uvicorn
 httpx
 pytest
 pytest-cov
+langchain
+langchain-community
+langchain-openai
+tavily-python
