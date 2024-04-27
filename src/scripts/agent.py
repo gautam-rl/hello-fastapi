@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
 from langchain import hub
-from langchain.agents import AgentExecutor, create_react_agent
+from langchain.agents import AgentExecutor, create_react_agent, create_tool_calling_agent
 from langchain_community.tools.tavily_search import TavilySearchResults
-from langchain_openai import OpenAI
+from langchain_openai import OpenAI, ChatOpenAI
 from dotenv import load_dotenv
-from langchain_core.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
 from tempfile import TemporaryDirectory
 
 from langchain_community.agent_toolkits import FileManagementToolkit
@@ -41,52 +41,58 @@ if __name__ == "__main__":
     file_tools = []
     file_tools += toolkit.get_tools()
 
-    human_tool = HumanInputRun(input_func=get_input)
+    #human_tool = HumanInputRun(input_func=get_input)
 
     #tools = [TavilySearchResults(max_results=1)]
-    tools = file_tools + [human_tool]
+    #tools = file_tools + [human_tool]
+    tools = file_tools
 
     # Get the prompt to use - you can modify this!
-    prompt = PromptTemplate.from_template("""
-        Answer the following questions as best you can. You have access to the following tools:
+    prompt = ChatPromptTemplate.from_messages(
+        [("system",
+            """
+            Answer the following questions as best you can. You have access to the following tools:
 
-        {tools}
+            {tools}
 
-        Use the following format:
+            Use the following format:
 
-        Question: the input question you must answer
+            Question: the input question you must answer
 
-        Thought: you should always think about what to do
+            Thought: you should always think about what to do
 
-        Action: the action to take, should be one of [{tool_names}]
+            Action: the action to take, should be one of [{tool_names}]
 
-        Action Input: the input to the action
+            Action Input: the input to the action
 
-        Observation: the result of the action
+            Observation: the result of the action
 
-        ... (this Thought/Action/Action Input/Observation can repeat N times)
+            ... (this Thought/Action/Action Input/Observation can repeat N times)
 
-        Thought: I now know the final answer
+            Thought: I now know the final answer
 
-        Final Answer: the final answer to the original input question
+            Final Answer: the final answer to the original input question
 
-        Begin!
+            Begin!
 
-        Question: {input}
+            Question: {input}
 
-        Thought:{agent_scratchpad}
-            """)
+            Thought:{agent_scratchpad}
+                """)
+                ])
 
     # Choose the LLM to use
     #llm = OpenAI(model="gpt-3.5-turbo-instruct")
-    llm = OpenAI()
+    #llm = OpenAI(model="gpt-4-turbo")
+    llm = ChatOpenAI(model="gpt-4-turbo")
 
     # Construct the ReAct agent
     agent = create_react_agent(llm, tools, prompt)
+    #agent = create_tool_calling_agent(llm, tools, prompt)
 
     # Create an agent executor by passing in the agent and tools
     agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 
-    #agent_executor.invoke({"input": "Describe the project in the current directory"})
-    #agent_executor.invoke({"input": "List the current directory"})
-    print([tool for tool in tools if isinstance(tool, ListDirectoryTool)][0].run("pwd"))
+    agent_executor.invoke({"input": "Describe the project in the current directory"})
+    #agent_executor.invoke({"input": "List the files in the current directory"})
+    #print([tool for tool in tools if isinstance(tool, ListDirectoryTool)][0].run("pwd"))
