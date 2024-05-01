@@ -11,6 +11,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from rich import print
 
 warnings.filterwarnings("ignore")
 
@@ -87,7 +88,21 @@ def chat_with_codebase(vector):
 
     while True:
         question = input("Enter your question:")
-        print(f" Answer: {rag_chain_with_source.invoke(question)}")
+        output = {}
+        curr_key = None
+        for chunk in rag_chain_with_source.stream(question):
+            for key in chunk:
+                if key not in output:
+                    output[key] = chunk[key]
+                else:
+                    output[key] += chunk[key]
+                if key != curr_key:
+                    print(f"\n\n{key}: {chunk[key]}", end="", flush=True)
+                else:
+                    print(chunk[key], end="", flush=True)
+                curr_key = key
+        
+        # print(f" Answer: {rag_chain_with_source.invoke(question)}")
 
 
 if __name__ == "__main__":
