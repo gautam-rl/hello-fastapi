@@ -6,7 +6,7 @@ import warnings
 from dotenv import load_dotenv
 from langchain_community.document_loaders.generic import GenericLoader
 from langchain_community.document_loaders.parsers import LanguageParser
-from langchain_community.vectorstores import FAISS
+from langchain_community.vectorstores.faiss import FAISS
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
@@ -18,22 +18,22 @@ warnings.filterwarnings("ignore")
 load_dotenv()
 
 llm = ChatOpenAI(model="gpt-4-turbo")
+embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+VECTOR_STORE_PATH = "runloop_java.vectorstore"
 
 
-def load_embeddings(path: str):
-    return FAISS.load_local(
-        path, embeddings=OpenAIEmbeddings(model="text-embedding-3-large")
-    )
+def load_vector_store(path: str):
+    return FAISS.load_local(path, embeddings=embeddings)
 
 
-def embed_codebase():
+def embed_codebase(sources_path="/Users/gautam/source/runloop/java/"):
     """
     Loads the codebase and returns the vector store.
     """
     # TODO If we have an existing vector store file, just load it.
 
     loader = GenericLoader.from_filesystem(
-        "/Users/gautam/source/runloop/java/",
+        sources_path,
         glob="**/*",
         suffixes=[".java"],
         show_progress=True,
@@ -41,18 +41,17 @@ def embed_codebase():
     )
     docs = loader.load()
 
-    embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
-    vector = FAISS.from_documents(docs, embeddings)
-    vector.save_local("runloop_java.vectorstore")
-    return vector
+    vector_store = FAISS.from_documents(docs, embeddings)
+    vector_store.save_local(VECTOR_STORE_PATH)
+    return vector_store
 
 
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 
 
-def chat_with_codebase(vector):
-    retriever = vector.as_retriever()
+def chat_with_codebase(vector_store):
+    retriever = vector_store.as_retriever()
     template = """
     Use the following pieces of context to answer the question at the end.
     If you don't know the answer, just say that you don't know, don't try to make up an answer.
@@ -65,13 +64,6 @@ def chat_with_codebase(vector):
     Helpful Answer:"""
     custom_rag_prompt = PromptTemplate.from_template(template)
 
-    # rag_chain = (
-    #     {"context": retriever | format_docs, "question": RunnablePassthrough()}
-    #     | custom_rag_prompt
-    #     | llm
-    #     | StrOutputParser()
-    # )
-
     rag_chain_from_docs = (
         RunnablePassthrough.assign(context=(lambda x: format_docs(x["context"])))
         | custom_rag_prompt
@@ -83,9 +75,8 @@ def chat_with_codebase(vector):
         {"context": retriever, "question": RunnablePassthrough()}
     ).assign(answer=rag_chain_from_docs)
 
-    # rag_chain_with_source.invoke("What is Task Decomposition")
-
-
+    # Question/answer loop.
+    # TODO - save/clear history
     while True:
         question = input("Enter your question:")
         output = {}
@@ -102,14 +93,13 @@ def chat_with_codebase(vector):
                     print(chunk[key], end="", flush=True)
                 curr_key = key
         print("\n")
-        
-        # print(f" Answer: {rag_chain_with_source.invoke(question)}")
 
 
 if __name__ == "__main__":
     # If runloop_java.vectorstore exists, just load it.
-    if os.path.exists("runloop_java.vectorstore"):
-        vector = load_embeddings("runloop_java.vectorstore")
+    if os.path.exists(VECTOR_STORE_PATH):
+        vector_store = load_vector_store(VECTOR_STORE_PATH)
     else:
-        vector = embed_codebase()
-    chat_with_codebase(vector)
+        vector_store = embed_codebase()
+
+    chat_with_codebase(vector_store)
