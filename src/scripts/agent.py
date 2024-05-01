@@ -101,6 +101,7 @@ def chat_with_codebase(vector):
                 else:
                     print(chunk[key], end="", flush=True)
                 curr_key = key
+        print("\n")
         
         # print(f" Answer: {rag_chain_with_source.invoke(question)}")
 
