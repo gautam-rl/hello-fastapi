@@ -12,3 +12,4 @@ langchain-community
 langchain-openai
 tavily-python
 python-dotenv
+tree-sitter
