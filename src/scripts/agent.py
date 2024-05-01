@@ -1,43 +1,38 @@
 #!/usr/bin/env python
 
+import os
 import warnings
-from tempfile import TemporaryDirectory
 
 from dotenv import load_dotenv
-from langchain_community.agent_toolkits import FileManagementToolkit
-from langchain_community.vectorstores import FAISS
-from langchain_openai import ChatOpenAI, OpenAI, OpenAIEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-warnings.filterwarnings("ignore")
-from pprint import pprint
-
 from langchain_community.document_loaders.generic import GenericLoader
 from langchain_community.document_loaders.parsers import LanguageParser
-from langchain_text_splitters import Language
-
-import bs4
-from langchain import hub
-from langchain_chroma import Chroma
+from langchain_community.vectorstores import FAISS
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import RunnableParallel, RunnablePassthrough
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+
+warnings.filterwarnings("ignore")
 
 load_dotenv()
 
 llm = ChatOpenAI(model="gpt-4-turbo")
 
 
-def load_codebase():
+def load_embeddings(path: str):
+    return FAISS.load_local(
+        path, embeddings=OpenAIEmbeddings(model="text-embedding-3-large")
+    )
+
+
+def embed_codebase():
     """
     Loads the codebase and returns the vector store.
     """
     # TODO If we have an existing vector store file, just load it.
 
     loader = GenericLoader.from_filesystem(
-        "/Users/gautam/source/runloop/java/src/main/java/ai/runloop/net/",
+        "/Users/gautam/source/runloop/java/",
         glob="**/*",
         suffixes=[".java"],
         show_progress=True,
@@ -69,21 +64,36 @@ def chat_with_codebase(vector):
     Helpful Answer:"""
     custom_rag_prompt = PromptTemplate.from_template(template)
 
-    rag_chain = (
-        {"context": retriever | format_docs, "question": RunnablePassthrough()}
+    # rag_chain = (
+    #     {"context": retriever | format_docs, "question": RunnablePassthrough()}
+    #     | custom_rag_prompt
+    #     | llm
+    #     | StrOutputParser()
+    # )
+
+    rag_chain_from_docs = (
+        RunnablePassthrough.assign(context=(lambda x: format_docs(x["context"])))
         | custom_rag_prompt
         | llm
         | StrOutputParser()
     )
 
+    rag_chain_with_source = RunnableParallel(
+        {"context": retriever, "question": RunnablePassthrough()}
+    ).assign(answer=rag_chain_from_docs)
+
+    # rag_chain_with_source.invoke("What is Task Decomposition")
+
+
     while True:
         question = input("Enter your question:")
-        print(f" Answer: {rag_chain.invoke(question)}")
+        print(f" Answer: {rag_chain_with_source.invoke(question)}")
 
 
 if __name__ == "__main__":
     # If runloop_java.vectorstore exists, just load it.
     if os.path.exists("runloop_java.vectorstore"):
+        vector = load_embeddings("runloop_java.vectorstore")
     else:
-        vector = load_codebase()
+        vector = embed_codebase()
     chat_with_codebase(vector)
